@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: MyCalw2
+
+server:
+  port: 8912
+
+app:
+  ai:
+    log: false
+    local: false
+    ollama:
+      model: ${OLLAMA_MODEL:llama3.3}
+      base_url: ${OLLAMA_BASE_URL:http://localhost:11434}

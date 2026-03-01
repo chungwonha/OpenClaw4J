@@ -1,0 +1,3 @@
+[submodule "_reference/langchain4j"]
+	path = _reference/langchain4j
+	url = https://github.com/langchain4j/langchain4j.git
