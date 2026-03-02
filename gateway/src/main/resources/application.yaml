@@ -1,0 +1,46 @@
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: gateway
+
+server:
+  port: 8881
+
+# ------------------------------------------------------------------
+# AI model — mirrors core's config keys for consistency
+# ------------------------------------------------------------------
+app:
+  ai:
+    log: false
+    local: false          # set to true to use Ollama instead of OpenAI
+    ollama:
+      model: ${OLLAMA_MODEL:llama3.3}
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: gpt-4o-mini
+  timeout: 60s
+
+# ------------------------------------------------------------------
+# Microsoft Teams / Bot Framework credentials
+# Register a bot at https://dev.botframework.com and set these.
+# Leave empty for local dev — the gateway will log replies instead
+# of actually sending them to Teams.
+# ------------------------------------------------------------------
+microsoft:
+  app:
+    id: ${MICROSOFT_APP_ID:}
+    password: ${MICROSOFT_APP_PASSWORD:}
+
+# ------------------------------------------------------------------
+# Gateway behaviour
+# ------------------------------------------------------------------
+gateway:
+  heartbeat:
+    enabled: true
+    interval-ms: 1800000   # 30 minutes (matches OpenClaw default)
+  teams:
+    verify-token: false    # TODO: enable JWT verification for production

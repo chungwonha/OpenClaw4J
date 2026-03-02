@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw compile -pl gateway -am -q)",
+      "Bash(mvn compile -pl gateway -am -q)",
+      "Bash(java -version)",
+      "Bash(mvn -version)",
+      "Bash(mvn spring-boot:run -pl gateway)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(netstat -ano)",
+      "Bash(mvn install -pl core -am -q)",
+      "Bash(mvn install -pl core -am -DskipTests -q)"
+    ]
+  }
+}
