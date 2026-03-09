@@ -24,8 +24,8 @@ import java.time.Instant;
 @Slf4j
 public class TeamsTokenService {
 
-    private static final String TOKEN_URL =
-            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token";
+    private static final String TOKEN_URL_TEMPLATE =
+            "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
     private static final String SCOPE =
             "https://api.botframework.com/.default";
 
@@ -34,6 +34,16 @@ public class TeamsTokenService {
 
     @Value("${microsoft.app.password:}")
     private String appPassword;
+
+    /**
+     * OAuth tenant for the token endpoint.
+     * Use "botframework.com" for legacy Multi-Tenant bots.
+     * Use your Azure AD tenant ID (GUID) for Single-Tenant bots — the default
+     * for all new Azure Bot Service resources created after ~2023.
+     * Find it: Azure Portal → Microsoft Entra ID → Overview → Tenant ID
+     */
+    @Value("${microsoft.app.tenant-id:botframework.com}")
+    private String tenantId;
 
     private final WebClient webClient;
 
@@ -60,10 +70,11 @@ public class TeamsTokenService {
             return cachedToken;
         }
 
-        log.debug("Fetching new Bot Framework OAuth token for appId={}", appId);
+        String tokenUrl = String.format(TOKEN_URL_TEMPLATE, tenantId);
+        log.debug("Fetching new Bot Framework OAuth token for appId={} via tenant={}", appId, tenantId);
         try {
             TokenResponse response = webClient.post()
-                    .uri(TOKEN_URL)
+                    .uri(tokenUrl)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(BodyInserters.fromFormData("grant_type", "client_credentials")
                             .with("client_id", appId)

@@ -34,6 +34,7 @@ microsoft:
   app:
     id: ${MICROSOFT_APP_ID:}
     password: ${MICROSOFT_APP_PASSWORD:}
+    tenant-id: ${MICROSOFT_TENANT_ID:}
 
 # ------------------------------------------------------------------
 # Gateway behaviour
@@ -43,4 +44,4 @@ gateway:
     enabled: true
     interval-ms: 1800000   # 30 minutes (matches OpenClaw default)
   teams:
-    verify-token: false    # TODO: enable JWT verification for production
+    verify-token: true    # TODO: enable JWT verification for production

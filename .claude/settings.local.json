@@ -9,7 +9,15 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(netstat -ano)",
       "Bash(mvn install -pl core -am -q)",
-      "Bash(mvn install -pl core -am -DskipTests -q)"
+      "Bash(mvn install -pl core -am -DskipTests -q)",
+      "Bash(mvn compile -pl gateway -am -DskipTests)",
+      "Bash(curl -s http://localhost:8881/api/agents)",
+      "Bash(curl -s -X POST http://localhost:8881/api/agents -H \"Content-Type: application/json\" -d \"{\"\"name\"\":\"\"research\"\",\"\"description\"\":\"\"Specialist in deep research and summarization. Always cite your sources and prefer structured output.\"\"}\")",
+      "Bash(curl -s http://localhost:8881/api/agents/research)",
+      "Bash(curl -s -X DELETE http://localhost:8881/api/agents/default)",
+      "Bash(curl -s -X DELETE http://localhost:8881/api/agents/research)",
+      "Bash(taskkill /F /IM java.exe /T)",
+      "Bash(cmd /c \"taskkill /F /IM java.exe /T\")"
     ]
   }
 }
