@@ -40,6 +40,9 @@ Works across all input channels:
 
 | Command | Description |
 |---|---|
+| `/new` | Clear all agent instances in the session and start fresh |
+| `/reset` | Clear the current agent's memory only |
+| `/stop` | Stop the session (fires COMMAND_STOP hook) |
 | `/use <agentName>` | Permanently switch the session's active agent |
 | `/agents` | List all registered agents and the current active one |
 | `@<agentName> <message>` | One-shot message to a named agent without switching |
@@ -108,6 +111,42 @@ Returns `202 Accepted`. The agent processes the payload asynchronously.
 | `REPLY_URL` | Agent response POSTed as JSON `{webhookId, webhookName, result}` to `replyUrl` |
 | `NONE` | Response discarded (fire-and-forget) |
 
+## Hook System
+
+Hooks are lifecycle callbacks fired at key gateway events. They enable extensible automation without modifying core code.
+
+### Hook Events
+
+| Event | Fired When |
+|---|---|
+| `GATEWAY_STARTUP` | Application is fully started |
+| `AGENT_BOOTSTRAP` | An agent instance is created for the first time in a session |
+| `SESSION_START` | A new session is created |
+| `SESSION_END` | A session ends |
+| `COMMAND_NEW` | User sends `/new` |
+| `COMMAND_RESET` | User sends `/reset` |
+| `COMMAND_STOP` | User sends `/stop` |
+| `TOOL_BEFORE` | Before an agent tool call |
+| `TOOL_AFTER` | After an agent tool call |
+| `LLM_INPUT` | Before sending a prompt to the LLM |
+| `LLM_OUTPUT` | After receiving a response from the LLM |
+
+### Bundled Hooks
+
+| Hook | Event | Default | Description |
+|---|---|---|---|
+| `session-memory` | `COMMAND_NEW` | **Enabled** | Saves a Markdown snapshot to `~/.openclaw4j/memory/<sessionId>-<timestamp>.md` |
+| `command-logger` | `COMMAND_NEW/RESET/STOP` | Disabled | Appends command log to `~/.openclaw4j/command-log.txt` |
+| `bootstrap-extra-files` | `AGENT_BOOTSTRAP` | Disabled | Injects files from `./hooks/bootstrap-extra-files/` into agent context |
+
+### Hook Management API
+
+```
+GET /api/hooks                   — list all hooks and their enabled status
+PUT /api/hooks/{name}/enable     — enable a hook
+PUT /api/hooks/{name}/disable    — disable a hook
+```
+
 ## Package Structure
 
 | Package | Contents |
@@ -118,6 +157,7 @@ Returns `202 Accepted`. The agent processes the payload asynchronously.
 | `dispatcher` | `AgentDispatcher` |
 | `eventqueue` | `EventQueue`, `GatewayEvent`, `GatewayEventType` |
 | `webhook` | `WebhookRegistry`, `WebhookDefinition`, `WebhookContext`, `WebhookOutputService` |
+| `hook` | `HookRegistry`, `HookExecutor`, `HookDefinition`, `HookEventType`, `HookContext`, `HookManagementController`, bundled hooks |
 | `integration.teams` | `TeamsActivity`, `TeamsReplyService`, `TeamsTokenService` |
 | `scheduler` | `HeartbeatScheduler` |
 | `config` | `GatewayAiConfig`, `CoreAgentConfig` |

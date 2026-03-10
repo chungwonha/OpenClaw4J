@@ -91,6 +91,9 @@ The gateway is an event-driven server that routes messages from external systems
 
 | Command | Description |
 |---|---|
+| `/new` | Clear all agent instances in the session and start fresh |
+| `/reset` | Clear the current agent's memory only |
+| `/stop` | Stop the session (fires COMMAND_STOP hook) |
 | `/use <agentName>` | Permanently switch the session's active agent |
 | `/agents` | List all registered agents |
 | `@<agentName> <message>` | One-shot message to a specific agent without switching |
@@ -194,6 +197,49 @@ Returns `202 Accepted` immediately. The agent processes the payload asynchronous
 ### Session Isolation
 
 Each webhook gets a dedicated session `webhook:{id}` by default, giving it its own persistent conversation memory. Set `sessionId` on the definition to share context with another session.
+
+---
+
+## Hook System
+
+Hooks are lightweight lifecycle callbacks fired at key points in the gateway. They enable extensible automation without modifying core code.
+
+### Hook Events
+
+| Event | Fired When |
+|---|---|
+| `GATEWAY_STARTUP` | Application is fully started |
+| `AGENT_BOOTSTRAP` | An agent instance is created for the first time in a session |
+| `SESSION_START` | A new session is created |
+| `SESSION_END` | A session ends |
+| `COMMAND_NEW` | User sends `/new` |
+| `COMMAND_RESET` | User sends `/reset` |
+| `COMMAND_STOP` | User sends `/stop` |
+| `TOOL_BEFORE` | Before an agent tool call |
+| `TOOL_AFTER` | After an agent tool call |
+| `LLM_INPUT` | Before sending a prompt to the LLM |
+| `LLM_OUTPUT` | After receiving a response from the LLM |
+
+### Bundled Hooks
+
+| Hook | Event | Default | Description |
+|---|---|---|---|
+| `session-memory` | `COMMAND_NEW` | **Enabled** | Saves a Markdown snapshot to `~/.openclaw4j/memory/` |
+| `command-logger` | `COMMAND_NEW/RESET/STOP` | Disabled | Appends command log to `~/.openclaw4j/command-log.txt` |
+| `bootstrap-extra-files` | `AGENT_BOOTSTRAP` | Disabled | Injects files from `./hooks/bootstrap-extra-files/` into agent context |
+
+### Hook Management API
+
+```bash
+# List all hooks and their enabled status
+GET /api/hooks
+
+# Enable a hook
+PUT /api/hooks/{name}/enable
+
+# Disable a hook
+PUT /api/hooks/{name}/disable
+```
 
 ---
 
