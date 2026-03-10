@@ -8,6 +8,9 @@ import com.chung.ai.software.mycalw2.gateway.integration.teams.TeamsActivity;
 import com.chung.ai.software.mycalw2.gateway.integration.teams.TeamsReplyService;
 import com.chung.ai.software.mycalw2.gateway.session.AgentSession;
 import com.chung.ai.software.mycalw2.gateway.session.SessionRegistry;
+import com.chung.ai.software.mycalw2.gateway.webhook.WebhookContext;
+import com.chung.ai.software.mycalw2.gateway.webhook.WebhookDefinition;
+import com.chung.ai.software.mycalw2.gateway.webhook.WebhookOutputService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,17 +46,20 @@ public class AgentDispatcher {
     private final EventQueue eventQueue;
     private final SessionRegistry sessionRegistry;
     private final TeamsReplyService teamsReplyService;
+    private final WebhookOutputService webhookOutputService;
     private final Executor executor;
     private final HookExecutor hookExecutor;
 
     public AgentDispatcher(EventQueue eventQueue,
                            SessionRegistry sessionRegistry,
                            TeamsReplyService teamsReplyService,
+                           WebhookOutputService webhookOutputService,
                            @Qualifier("gatewayExecutor") Executor executor,
                            HookExecutor hookExecutor) {
         this.eventQueue = eventQueue;
         this.sessionRegistry = sessionRegistry;
         this.teamsReplyService = teamsReplyService;
+        this.webhookOutputService = webhookOutputService;
         this.executor = executor;
         this.hookExecutor = hookExecutor;
     }
@@ -122,7 +128,19 @@ public class AgentDispatcher {
     }
 
     private void handleWebhook(GatewayEvent event) {
-        log.info("[Dispatcher] Webhook event for session='{}': {}", event.getSessionId(), event.getPayload());
-        // TODO: route webhook payloads to the relevant session and trigger agent response
+        WebhookContext context = (WebhookContext) event.getMetadata();
+        WebhookDefinition definition = context.getDefinition();
+
+        String prompt = definition.getPromptTemplate()
+                .replace("{{payload}}",     context.getRawPayload())
+                .replace("{{webhookName}}", definition.getName())
+                .replace("{{timestamp}}",   event.getTimestamp().toString());
+
+        log.info("[Dispatcher] Webhook='{}' routing to agent='{}' in session='{}'",
+                definition.getId(), definition.getAgentName(), event.getSessionId());
+
+        AgentSession session = sessionRegistry.getOrCreate(event.getSessionId());
+        String result = session.chatWithAgent(definition.getAgentName(), prompt);
+        webhookOutputService.send(definition, result);
     }
 }

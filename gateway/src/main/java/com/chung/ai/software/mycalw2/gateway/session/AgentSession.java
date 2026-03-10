@@ -118,6 +118,17 @@ public class AgentSession {
         return routeTo(activeAgentName, msg);
     }
 
+    /**
+     * Route a message directly to a named agent, bypassing the active-agent
+     * selection and in-chat command parsing. Used by AgentDispatcher when
+     * processing WEBHOOK events where the target agent is known from the
+     * WebhookDefinition, not from user input.
+     */
+    public String chatWithAgent(String agentName, String message) {
+        lastActiveAt = Instant.now();
+        return routeTo(agentName, message);
+    }
+
     // ------------------------------------------------------------------ //
     //  Command handlers
     // ------------------------------------------------------------------ //
