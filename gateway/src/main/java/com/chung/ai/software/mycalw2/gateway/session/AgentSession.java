@@ -4,6 +4,8 @@ import com.chung.ai.software.mycalw2.ChatAgent;
 import com.chung.ai.software.mycalw2.ChatAgentFactory;
 import com.chung.ai.software.mycalw2.gateway.agent.AgentDefinition;
 import com.chung.ai.software.mycalw2.gateway.agent.AgentRegistry;
+import com.chung.ai.software.mycalw2.gateway.hook.HookEventType;
+import com.chung.ai.software.mycalw2.gateway.hook.HookExecutor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,9 +31,13 @@ import java.util.stream.Collectors;
  * 200-message memory window.  Two sessions using "research" have separate memories.
  *
  * Routing table (checked in order):
- *   1. Starts with "/use "  → switchAgent command
- *   2. Starts with "@"      → one-shot route to named agent
- *   3. Otherwise            → route to activeAgentName
+ *   1. Equals "/new"       → reset session, fire COMMAND_NEW hook
+ *   2. Starts with "/use " → switchAgent command
+ *   3. Equals "/agents"    → list all registered agents
+ *   4. Equals "/reset"     → reset current agent, fire COMMAND_RESET hook
+ *   5. Equals "/stop"      → stop session, fire COMMAND_STOP hook
+ *   6. Starts with "@"     → one-shot route to named agent
+ *   7. Otherwise           → route to activeAgentName
  */
 @Slf4j
 public class AgentSession {
@@ -43,22 +49,27 @@ public class AgentSession {
 
     private final ChatAgentFactory agentFactory;
     private final AgentRegistry agentRegistry;
+    private final HookExecutor hookExecutor;
 
     /** Per-session agent instances: agentName → ChatAgent (lazy-created on first use). */
     private final ConcurrentHashMap<String, ChatAgent> agentInstances = new ConcurrentHashMap<>();
 
     public AgentSession(String conversationId,
                         ChatAgentFactory agentFactory,
-                        AgentRegistry agentRegistry) {
-        this.conversationId = conversationId;
-        this.createdAt      = Instant.now();
-        this.lastActiveAt   = Instant.now();
-        this.agentFactory   = agentFactory;
-        this.agentRegistry  = agentRegistry;
+                        AgentRegistry agentRegistry,
+                        HookExecutor hookExecutor) {
+        this.conversationId  = conversationId;
+        this.createdAt       = Instant.now();
+        this.lastActiveAt    = Instant.now();
+        this.agentFactory    = agentFactory;
+        this.agentRegistry   = agentRegistry;
+        this.hookExecutor    = hookExecutor;
         this.activeAgentName = AgentRegistry.DEFAULT_AGENT;
 
         log.info("[Session] Created session='{}' active-agent='{}'",
                 conversationId, activeAgentName);
+
+        hookExecutor.fire(HookEventType.SESSION_START, conversationId, "Session started");
     }
 
     // ------------------------------------------------------------------ //
@@ -69,8 +80,11 @@ public class AgentSession {
      * Main entry point called by AgentDispatcher for every MESSAGE event.
      *
      * Routing rules (in priority order):
+     *   /new                 → reset session (clear all agents), fire COMMAND_NEW hook
      *   /use agentName       → switch active agent, return confirmation
      *   /agents              → list all registered agents
+     *   /reset               → reset current agent (clear its memory), fire COMMAND_RESET hook
+     *   /stop                → stop session, fire COMMAND_STOP hook
      *   @agentName message   → one-shot route to named agent
      *   (anything else)      → route to activeAgentName
      */
@@ -78,11 +92,20 @@ public class AgentSession {
         lastActiveAt = Instant.now();
         String msg = userMessage.trim();
 
+        if ("/new".equalsIgnoreCase(msg)) {
+            return handleNewCommand();
+        }
         if (msg.startsWith("/use ")) {
             return handleUseCommand(msg.substring(5).trim());
         }
         if ("/agents".equalsIgnoreCase(msg)) {
             return handleListCommand();
+        }
+        if ("/reset".equalsIgnoreCase(msg)) {
+            return handleResetCommand();
+        }
+        if ("/stop".equalsIgnoreCase(msg)) {
+            return handleStopCommand();
         }
         if (msg.startsWith("@")) {
             int space = msg.indexOf(' ');
@@ -115,6 +138,27 @@ public class AgentSession {
                 + "\n\nUse `/use agentName` to switch, or `@agentName message` to address one directly.";
     }
 
+    private String handleNewCommand() {
+        hookExecutor.fire(HookEventType.COMMAND_NEW, conversationId, "");
+        agentInstances.clear();
+        activeAgentName = AgentRegistry.DEFAULT_AGENT;
+        log.info("[Session] '{}' executed /new — all agent instances cleared", conversationId);
+        return "✅ Session reset. Starting fresh.";
+    }
+
+    private String handleResetCommand() {
+        hookExecutor.fire(HookEventType.COMMAND_RESET, conversationId, activeAgentName);
+        agentInstances.remove(activeAgentName);
+        log.info("[Session] '{}' executed /reset — agent='{}' instance removed", conversationId, activeAgentName);
+        return "✅ Agent **" + activeAgentName + "** reset. Memory cleared for this agent.";
+    }
+
+    private String handleStopCommand() {
+        hookExecutor.fire(HookEventType.COMMAND_STOP, conversationId, "");
+        log.info("[Session] '{}' executed /stop", conversationId);
+        return "✅ Session stopped. Type any message to start a new session.";
+    }
+
     // ------------------------------------------------------------------ //
     //  Routing
     // ------------------------------------------------------------------ //
@@ -131,6 +175,8 @@ public class AgentSession {
             String instanceId = conversationId + ":" + name;
             log.info("[Session] Creating instance of agent='{}' for session='{}'",
                     name, conversationId);
+            hookExecutor.fire(HookEventType.AGENT_BOOTSTRAP, conversationId,
+                    "Bootstrapping agent: " + name);
             return agentFactory.createChatAgent(instanceId, def.get().getDescription());
         });
 

@@ -2,6 +2,8 @@ package com.chung.ai.software.mycalw2.gateway.dispatcher;
 
 import com.chung.ai.software.mycalw2.gateway.eventqueue.EventQueue;
 import com.chung.ai.software.mycalw2.gateway.eventqueue.GatewayEvent;
+import com.chung.ai.software.mycalw2.gateway.hook.HookEventType;
+import com.chung.ai.software.mycalw2.gateway.hook.HookExecutor;
 import com.chung.ai.software.mycalw2.gateway.integration.teams.TeamsActivity;
 import com.chung.ai.software.mycalw2.gateway.integration.teams.TeamsReplyService;
 import com.chung.ai.software.mycalw2.gateway.session.AgentSession;
@@ -42,15 +44,18 @@ public class AgentDispatcher {
     private final SessionRegistry sessionRegistry;
     private final TeamsReplyService teamsReplyService;
     private final Executor executor;
+    private final HookExecutor hookExecutor;
 
     public AgentDispatcher(EventQueue eventQueue,
                            SessionRegistry sessionRegistry,
                            TeamsReplyService teamsReplyService,
-                           @Qualifier("gatewayExecutor") Executor executor) {
+                           @Qualifier("gatewayExecutor") Executor executor,
+                           HookExecutor hookExecutor) {
         this.eventQueue = eventQueue;
         this.sessionRegistry = sessionRegistry;
         this.teamsReplyService = teamsReplyService;
         this.executor = executor;
+        this.hookExecutor = hookExecutor;
     }
 
     /**
@@ -107,8 +112,13 @@ public class AgentDispatcher {
     }
 
     private void handleHook(GatewayEvent event) {
-        log.info("[Dispatcher] Hook event: {}", event.getPayload());
-        // Internal lifecycle events (startup, shutdown, agent-reset, etc.)
+        String rawType = event.getPayload();
+        try {
+            HookEventType hookEventType = HookEventType.valueOf(rawType.toUpperCase());
+            hookExecutor.fire(hookEventType, event.getSessionId(), event.getPayload());
+        } catch (IllegalArgumentException e) {
+            log.warn("[Dispatcher] Unknown hook event type in payload: {}", rawType);
+        }
     }
 
     private void handleWebhook(GatewayEvent event) {

@@ -1,7 +1,7 @@
 package com.chung.ai.software.mycalw2.gateway.integration.teams;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -27,11 +27,19 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class TeamsReplyService {
 
     private final WebClient.Builder webClientBuilder;
     private final TeamsTokenService tokenService;
+
+    /** Set gateway.teams.reply-enabled=false to log replies locally without sending to Teams. */
+    @Value("${gateway.teams.reply-enabled:true}")
+    private boolean replyEnabled;
+
+    public TeamsReplyService(WebClient.Builder webClientBuilder, TeamsTokenService tokenService) {
+        this.webClientBuilder = webClientBuilder;
+        this.tokenService = tokenService;
+    }
 
     public void sendReply(TeamsActivity incomingActivity, String replyText) {
         String conversationId = incomingActivity.getConversation().getId();
@@ -40,6 +48,11 @@ public class TeamsReplyService {
 
         log.info("[Teams] Replying to conversation='{}', activityId='{}'", conversationId, activityId);
         log.debug("[Teams] Reply text: {}", replyText);
+
+        if (!replyEnabled) {
+            log.info("[Teams] reply-enabled=false — reply suppressed. Text: {}", replyText);
+            return;
+        }
 
         TeamsActivity.ChannelAccount botAccount = new TeamsActivity.ChannelAccount();
         botAccount.setId(incomingActivity.getRecipient().getId());
@@ -61,17 +74,15 @@ public class TeamsReplyService {
         boolean hasToken = StringUtils.hasText(token);
 
         if (!hasToken) {
-            log.info("[Teams] No credentials configured — sending unauthenticated reply (emulator mode)");
+            log.info("[Teams] No credentials configured — dev mode, reply not sent to Teams. Text: {}", replyText);
+            return;
         }
 
         WebClient.RequestBodySpec request = webClientBuilder.build()
                 .post()
                 .uri(url)
-                .contentType(MediaType.APPLICATION_JSON);
-
-        if (hasToken) {
-            request = request.header("Authorization", "Bearer " + token);
-        }
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + token);
 
         request.bodyValue(reply)
                 .retrieve()

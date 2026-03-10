@@ -2,7 +2,7 @@ package com.chung.ai.software.mycalw2.gateway.session;
 
 import com.chung.ai.software.mycalw2.ChatAgentFactory;
 import com.chung.ai.software.mycalw2.gateway.agent.AgentRegistry;
-import lombok.RequiredArgsConstructor;
+import com.chung.ai.software.mycalw2.gateway.hook.HookExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -20,10 +20,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * instances on first use.
  *
  * This models OpenClaw's "per-channel isolated session" behaviour.
+ *
+ * Note: explicit constructor (not @RequiredArgsConstructor) is required so that
+ * {@link HookExecutor} can be injected and forwarded to every new {@link AgentSession}.
  */
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class SessionRegistry {
 
     /** Provided by CoreAgentConfig — creates ChatAgents with tools + memory. */
@@ -32,7 +34,18 @@ public class SessionRegistry {
     /** Central registry of named agent definitions — passed to every new session. */
     private final AgentRegistry agentRegistry;
 
+    /** Executor forwarded to every new session for hook firing. */
+    private final HookExecutor hookExecutor;
+
     private final ConcurrentHashMap<String, AgentSession> sessions = new ConcurrentHashMap<>();
+
+    public SessionRegistry(ChatAgentFactory agentFactory,
+                           AgentRegistry agentRegistry,
+                           HookExecutor hookExecutor) {
+        this.agentFactory = agentFactory;
+        this.agentRegistry = agentRegistry;
+        this.hookExecutor = hookExecutor;
+    }
 
     /**
      * Returns the existing session for {@code conversationId}, or creates a new one
@@ -41,7 +54,7 @@ public class SessionRegistry {
     public AgentSession getOrCreate(String conversationId) {
         return sessions.computeIfAbsent(conversationId, id -> {
             log.info("[SessionRegistry] New session created for conversationId='{}'", id);
-            return new AgentSession(id, agentFactory, agentRegistry);
+            return new AgentSession(id, agentFactory, agentRegistry, hookExecutor);
         });
     }
 
