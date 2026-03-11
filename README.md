@@ -78,6 +78,7 @@ The gateway is an event-driven server that routes messages from external systems
 |---|---|---|
 | **MS Teams** | `POST /api/messages` | Microsoft Bot Framework webhook |
 | **Webhooks** | `POST /api/webhooks/{id}` | External system triggers (CI, monitoring, etc.) |
+| **Cron Jobs** | `POST /api/cron-definitions` | Scheduled recurring agent tasks |
 
 ### Key Features
 
@@ -197,6 +198,87 @@ Returns `202 Accepted` immediately. The agent processes the payload asynchronous
 ### Session Isolation
 
 Each webhook gets a dedicated session `webhook:{id}` by default, giving it its own persistent conversation memory. Set `sessionId` on the definition to share context with another session.
+
+---
+
+## Cron System
+
+Cron jobs schedule recurring AI agent tasks without any external trigger. Each job runs on a Spring cron expression and routes a configurable prompt to an agent.
+
+### How It Works
+
+```
+CronScheduler (Spring CronTrigger)
+         ↓  fires on schedule
+     EventQueue
+         ↓
+  AgentDispatcher (async)
+         ↓
+  prompt = template.replace({{cronName}}, {{timestamp}})
+         ↓
+   AgentSession.chatWithAgent()
+         ↓
+  CronOutputService → LOG / REPLY_URL / NONE
+```
+
+### Cron Management API
+
+```bash
+# Register a cron job
+POST /api/cron-definitions
+{
+  "name": "daily-summary",
+  "description": "Runs every day at 9am on weekdays",
+  "cronExpression": "0 0 9 * * MON-FRI",
+  "promptTemplate": "Generate a brief status summary. Timestamp: {{timestamp}}",
+  "agentName": "default",
+  "outputTarget": "LOG"
+}
+# → returns { "id": "abc-123", ... }
+
+# List all cron jobs
+GET /api/cron-definitions
+
+# Get one
+GET /api/cron-definitions/{id}
+
+# Enable / disable (without deleting)
+PUT /api/cron-definitions/{id}/enable
+PUT /api/cron-definitions/{id}/disable
+
+# Delete
+DELETE /api/cron-definitions/{id}
+```
+
+### Prompt Template Placeholders
+
+| Placeholder | Value |
+|---|---|
+| `{{cronName}}` | The job's `name` field |
+| `{{timestamp}}` | ISO-8601 timestamp when the job fired |
+
+### Output Targets
+
+| Target | Behaviour |
+|---|---|
+| `LOG` | Agent response written to application log (default) |
+| `REPLY_URL` | Agent response HTTP POSTed as JSON to `replyUrl` |
+| `NONE` | Response discarded (fire-and-forget) |
+
+### Cron Expression Format
+
+6-field Spring format: `second minute hour day-of-month month day-of-week`
+
+| Expression | Meaning |
+|---|---|
+| `*/10 * * * * *` | Every 10 seconds |
+| `0 * * * * *` | Every minute |
+| `0 0 * * * *` | Every hour |
+| `0 0 9 * * MON-FRI` | 9am on weekdays |
+
+### Session Isolation
+
+Each cron job gets a dedicated session `cron:{id}` by default, giving it its own persistent conversation memory. Set `sessionId` on the definition to share context with another session.
 
 ---
 

@@ -34,6 +34,10 @@ Receives Microsoft Bot Framework Activity v3 events. Supports `message` and `con
 
 External systems trigger agent tasks by POSTing any payload to a registered webhook URL. See [Webhook System](#webhook-system) below.
 
+### Cron Jobs (`POST /api/cron-definitions`)
+
+Recurring scheduled tasks that fire an agent prompt on a cron expression. See [Cron System](#cron-system) below.
+
 ## In-Chat Commands
 
 Works across all input channels:
@@ -111,6 +115,67 @@ Returns `202 Accepted`. The agent processes the payload asynchronously.
 | `REPLY_URL` | Agent response POSTed as JSON `{webhookId, webhookName, result}` to `replyUrl` |
 | `NONE` | Response discarded (fire-and-forget) |
 
+## Cron System
+
+Cron jobs schedule recurring AI agent tasks internally using Spring's `TaskScheduler`. No external trigger is needed — jobs fire automatically on a cron expression.
+
+### Cron Management API
+
+```
+GET    /api/cron-definitions          — list all cron jobs
+GET    /api/cron-definitions/{id}     — get a specific cron job
+POST   /api/cron-definitions          — register a new cron job
+DELETE /api/cron-definitions/{id}     — remove a cron job
+PUT    /api/cron-definitions/{id}/enable   — enable and schedule
+PUT    /api/cron-definitions/{id}/disable  — disable and cancel
+```
+
+**Register request body:**
+```json
+{
+  "name": "daily-summary",
+  "description": "Runs every weekday at 9am",
+  "agentName": "default",
+  "sessionId": null,
+  "cronExpression": "0 0 9 * * MON-FRI",
+  "promptTemplate": "Generate a status summary.\nTimestamp: {{timestamp}}",
+  "outputTarget": "LOG",
+  "replyUrl": null,
+  "enabled": true
+}
+```
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `name` | Yes | — | Human-readable name |
+| `description` | No | `""` | What this job does |
+| `agentName` | No | `"default"` | Which registered agent handles it |
+| `sessionId` | No | `null` | Pin to a session; `null` = dedicated `cron:{id}` session |
+| `cronExpression` | Yes | — | 6-field Spring cron (see below) |
+| `promptTemplate` | No | built-in | Prompt with `{{cronName}}`, `{{timestamp}}` placeholders |
+| `outputTarget` | No | `LOG` | `NONE` / `LOG` / `REPLY_URL` |
+| `replyUrl` | Conditional | — | Required when `outputTarget=REPLY_URL` |
+| `enabled` | No | `true` | Whether to schedule immediately on registration |
+
+### Cron Expression Format
+
+6-field Spring format: `second minute hour day-of-month month day-of-week`
+
+| Expression | Meaning |
+|---|---|
+| `*/10 * * * * *` | Every 10 seconds |
+| `0 * * * * *` | Every minute |
+| `0 0 * * * *` | Every hour |
+| `0 0 9 * * MON-FRI` | 9am on weekdays |
+
+### Output Targets
+
+| Target | Behaviour |
+|---|---|
+| `LOG` | Agent response written to application log at INFO level |
+| `REPLY_URL` | Agent response POSTed as JSON `{cronId, cronName, result}` to `replyUrl` |
+| `NONE` | Response discarded (fire-and-forget) |
+
 ## Hook System
 
 Hooks are lifecycle callbacks fired at key gateway events. They enable extensible automation without modifying core code.
@@ -151,12 +216,13 @@ PUT /api/hooks/{name}/disable    — disable a hook
 
 | Package | Contents |
 |---|---|
-| `adapter.input` | `TeamsController`, `WebhookController`, `WebhookManagementController`, `AgentManagementController` |
+| `adapter.input` | `TeamsController`, `WebhookController`, `WebhookManagementController`, `AgentManagementController`, `CronManagementController` |
 | `agent` | `AgentRegistry`, `AgentDefinition` |
 | `session` | `SessionRegistry`, `AgentSession` |
 | `dispatcher` | `AgentDispatcher` |
 | `eventqueue` | `EventQueue`, `GatewayEvent`, `GatewayEventType` |
 | `webhook` | `WebhookRegistry`, `WebhookDefinition`, `WebhookContext`, `WebhookOutputService` |
+| `cron` | `CronRegistry`, `CronDefinition`, `CronContext`, `CronScheduler`, `CronOutputService` |
 | `hook` | `HookRegistry`, `HookExecutor`, `HookDefinition`, `HookEventType`, `HookContext`, `HookManagementController`, bundled hooks |
 | `integration.teams` | `TeamsActivity`, `TeamsReplyService`, `TeamsTokenService` |
 | `scheduler` | `HeartbeatScheduler` |
