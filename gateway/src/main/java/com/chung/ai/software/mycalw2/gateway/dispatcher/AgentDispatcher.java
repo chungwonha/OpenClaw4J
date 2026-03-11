@@ -1,5 +1,8 @@
 package com.chung.ai.software.mycalw2.gateway.dispatcher;
 
+import com.chung.ai.software.mycalw2.gateway.cron.CronContext;
+import com.chung.ai.software.mycalw2.gateway.cron.CronDefinition;
+import com.chung.ai.software.mycalw2.gateway.cron.CronOutputService;
 import com.chung.ai.software.mycalw2.gateway.eventqueue.EventQueue;
 import com.chung.ai.software.mycalw2.gateway.eventqueue.GatewayEvent;
 import com.chung.ai.software.mycalw2.gateway.hook.HookEventType;
@@ -47,6 +50,7 @@ public class AgentDispatcher {
     private final SessionRegistry sessionRegistry;
     private final TeamsReplyService teamsReplyService;
     private final WebhookOutputService webhookOutputService;
+    private final CronOutputService cronOutputService;
     private final Executor executor;
     private final HookExecutor hookExecutor;
 
@@ -54,12 +58,14 @@ public class AgentDispatcher {
                            SessionRegistry sessionRegistry,
                            TeamsReplyService teamsReplyService,
                            WebhookOutputService webhookOutputService,
+                           CronOutputService cronOutputService,
                            @Qualifier("gatewayExecutor") Executor executor,
                            HookExecutor hookExecutor) {
         this.eventQueue = eventQueue;
         this.sessionRegistry = sessionRegistry;
         this.teamsReplyService = teamsReplyService;
         this.webhookOutputService = webhookOutputService;
+        this.cronOutputService = cronOutputService;
         this.executor = executor;
         this.hookExecutor = hookExecutor;
     }
@@ -113,8 +119,19 @@ public class AgentDispatcher {
     }
 
     private void handleCron(GatewayEvent event) {
-        log.info("[Dispatcher] Cron event fired for session='{}': {}", event.getSessionId(), event.getPayload());
-        // TODO: route the cron prompt to the specific session and send the result back
+        CronContext context = (CronContext) event.getMetadata();
+        CronDefinition definition = context.getDefinition();
+
+        String prompt = definition.getPromptTemplate()
+                .replace("{{cronName}}", definition.getName())
+                .replace("{{timestamp}}", event.getTimestamp().toString());
+
+        log.info("[Dispatcher] Cron='{}' routing to agent='{}' in session='{}'",
+                definition.getId(), definition.getAgentName(), event.getSessionId());
+
+        AgentSession session = sessionRegistry.getOrCreate(event.getSessionId());
+        String result = session.chatWithAgent(definition.getAgentName(), prompt);
+        cronOutputService.send(definition, result);
     }
 
     private void handleHook(GatewayEvent event) {

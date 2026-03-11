@@ -9,6 +9,8 @@ import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
  * Bridges the core module's agent infrastructure into the gateway's Spring context.
@@ -53,6 +55,15 @@ public class CoreAgentConfig {
     @Bean
     public AgentPersistenceService agentPersistenceService() {
         return new AgentPersistenceService();
+    }
+
+    @Bean
+    public TaskScheduler cronTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(4);
+        scheduler.setThreadNamePrefix("cron-");
+        scheduler.initialize();
+        return scheduler;
     }
 
     /**
