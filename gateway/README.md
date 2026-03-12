@@ -9,9 +9,24 @@ The `gateway` module is an event-driven HTTP server (port 8881) that routes mess
 ```
 Input Adapters          EventQueue          AgentDispatcher (every 100ms)
 ─────────────           ──────────          ─────────────────────────────
-TeamsController    →                   →    handleMessage  → TeamsReplyService
-WebhookController  →    GatewayEvent   →    handleWebhook  → WebhookOutputService
+TeamsController    →                   →    handleMessage  → AgentSession → TeamsReplyService
+WebhookController  →    GatewayEvent   →    handleWebhook  → AgentSession → WebhookOutputService
+CronScheduler      →                   →    handleCron     → AgentSession → CronOutputService
 HeartbeatScheduler →                   →    handleHeartbeat
+                                            handleHook     → HookExecutor
+```
+
+```
+AgentSession (per conversation)
+────────────────────────────────
+  SessionStart hook
+  ↓
+  in-chat command? (/new, /reset, /stop, /use, /agents, @agent)
+  ↓
+  ChatAgent (lazily created, isolated 200-msg memory)
+  ↓
+  AgentBootstrap hook (first use) → LlmInput hook → LLM → LlmOutput hook
+                                  → ToolBefore hook → Tool → ToolAfter hook
 ```
 
 ### Key Components
@@ -23,6 +38,7 @@ HeartbeatScheduler →                   →    handleHeartbeat
 - **AgentSession**: One session per conversation. Routes messages to lazily-created `ChatAgent` instances, each with an isolated 200-message memory window.
 - **AgentRegistry**: Stores named agent definitions (`AgentDefinition`). The `"default"` agent is always present.
 - **WebhookRegistry**: Stores registered webhook definitions at runtime.
+- **HookRegistry / HookExecutor**: Registers lifecycle `HookDefinition`s and fires them synchronously at key gateway events (session start, agent bootstrap, commands, LLM calls, tool calls).
 
 ## Input Channels
 
@@ -227,6 +243,48 @@ PUT /api/hooks/{name}/disable    — disable a hook
 | `integration.teams` | `TeamsActivity`, `TeamsReplyService`, `TeamsTokenService` |
 | `scheduler` | `HeartbeatScheduler` |
 | `config` | `GatewayAiConfig`, `CoreAgentConfig` |
+
+## Testing with MS Teams via ngrok
+
+Teams requires a publicly reachable HTTPS endpoint to deliver messages to your bot. During local development, use [ngrok](https://ngrok.com) to create a secure tunnel to your local gateway.
+
+### 1. Start the gateway
+
+```bash
+export OPENAI_API_KEY=sk-...
+export MICROSOFT_APP_ID=<your-bot-app-id>
+export MICROSOFT_APP_PASSWORD=<your-bot-app-password>
+cd gateway && mvn spring-boot:run
+```
+
+### 2. Start ngrok
+
+```bash
+ngrok http 8881
+```
+
+ngrok prints a forwarding URL like `https://abc123.ngrok-free.app`. Copy that URL.
+
+### 3. Register the messaging endpoint in Azure Bot
+
+1. Go to [Azure Portal](https://portal.azure.com) → your **Azure Bot** resource → **Configuration**.
+2. Set **Messaging endpoint** to: `https://<your-ngrok-subdomain>.ngrok-free.app/api/messages`
+3. Click **Apply**.
+
+### 4. Connect the bot to Teams
+
+In the Azure Bot resource, go to **Channels** → add **Microsoft Teams** if not already added.
+
+### 5. Test in Teams
+
+Open Microsoft Teams, search for your bot by name (or use the App ID link), and send it a message. You should see the request arrive in your gateway logs and a reply returned to Teams.
+
+### Tips
+
+- ngrok free-tier URLs change every time you restart ngrok. Re-update the messaging endpoint in Azure each session. A paid ngrok plan lets you reserve a static subdomain.
+- Set `gateway.teams.verify-token: false` in `application.yaml` during local testing to skip JWT verification (Teams tokens must be validated against Microsoft's public keys, which requires your bot to be registered properly).
+- Watch gateway logs (`AgentDispatcher`, `TeamsReplyService`) to trace the full request/reply cycle.
+- Use `ngrok http 8881 --log=stdout` to see all tunnelled requests in the terminal.
 
 ## Prerequisites
 

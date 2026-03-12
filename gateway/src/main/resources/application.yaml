@@ -45,4 +45,4 @@ gateway:
     interval-ms: 1800000   # 30 minutes (matches OpenClaw default)
   teams:
     verify-token: true    # TODO: enable JWT verification for production
-    reply-enabled: false   # set to false for local curl testing (suppresses outbound HTTP to Teams)
+    reply-enabled: true   # set to false for local curl testing (suppresses outbound HTTP to Teams)
