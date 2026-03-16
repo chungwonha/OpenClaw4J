@@ -44,8 +44,8 @@ OpenClaw4J is a Spring Boot AI agent platform powered by [LangChain4j](https://g
 ### Running
 
 ```bash
-mvn install -DskipTests        # build from project root first
-cd core && mvn spring-boot:run
+mvn clean install -DskipTests   # build from project root first
+mvn spring-boot:run -pl core
 ```
 
 ### CLI Commands
@@ -352,7 +352,7 @@ export MICROSOFT_TENANT_ID=...
 ### 3. Run
 
 ```bash
-cd gateway && mvn spring-boot:run
+mvn spring-boot:run -pl gateway
 # or
 java -jar gateway/target/gateway-0.0.1-SNAPSHOT.jar
 ```

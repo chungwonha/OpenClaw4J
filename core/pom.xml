@@ -4,13 +4,13 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.chung.ai.software</groupId>
-        <artifactId>MyCalw2</artifactId>
+        <artifactId>openclaw4j</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>core</artifactId>
     <name>core</name>
-    <description>Core logic for MyCalw2</description>
+    <description>Core logic for openclaw4j</description>
 
     <dependencies>
         <dependency>

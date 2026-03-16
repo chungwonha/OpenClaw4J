@@ -18,7 +18,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./mvnw spring-boot:run -pl core
 
 # Run the gateway server (port 8881)
-cd gateway && mvn spring-boot:run
+# First time or after package changes: clean install everything first
+mvn clean install -DskipTests
+mvn spring-boot:run -pl gateway
 # Or via fat jar after build:
 java -jar gateway/target/gateway-0.0.1-SNAPSHOT.jar
 ```

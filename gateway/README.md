@@ -254,7 +254,7 @@ Teams requires a publicly reachable HTTPS endpoint to deliver messages to your b
 export OPENAI_API_KEY=sk-...
 export MICROSOFT_APP_ID=<your-bot-app-id>
 export MICROSOFT_APP_PASSWORD=<your-bot-app-password>
-cd gateway && mvn spring-boot:run
+mvn spring-boot:run -pl gateway
 ```
 
 ### 2. Start ngrok
@@ -310,13 +310,13 @@ Open Microsoft Teams, search for your bot by name (or use the App ID link), and 
 
 ```bash
 # 1. Build from project root
-mvn install -DskipTests
+mvn clean install -DskipTests
 
 # 2. Set env vars
 export OPENAI_API_KEY=sk-...
 
 # 3. Run
-cd gateway && mvn spring-boot:run
+mvn spring-boot:run -pl gateway
 # or
 java -jar gateway/target/gateway-0.0.1-SNAPSHOT.jar
 ```

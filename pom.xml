@@ -9,11 +9,11 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.chung.ai.software</groupId>
-    <artifactId>MyCalw2</artifactId>
+    <artifactId>openclaw4j</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>MyCalw2</name>
-    <description>MyCalw2</description>
+    <name>openclaw4j</name>
+    <description>openclaw4j</description>
 
     <modules>
         <module>core</module>
