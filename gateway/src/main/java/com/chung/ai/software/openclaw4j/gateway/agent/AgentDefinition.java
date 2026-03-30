@@ -1,5 +1,6 @@
 package com.chung.ai.software.openclaw4j.gateway.agent;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,6 +28,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AgentDefinition {
 
     /** Unique, URL-safe name (e.g. "default", "research", "calendar"). */

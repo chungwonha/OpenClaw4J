@@ -1,12 +1,15 @@
 package com.chung.ai.software.openclaw4j.gateway.webhook;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
 /**
- * Immutable definition of a registered webhook endpoint.
+ * Definition of a registered webhook endpoint.
  *
  * When an external system POSTs to /api/webhooks/{id}, the gateway looks up
  * the matching WebhookDefinition to know:
@@ -17,22 +20,25 @@ import java.time.Instant;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class WebhookDefinition {
 
-    private final String id;
-    private final String name;
-    private final String description;
+    private String id;
+    private String name;
+    private String description;
 
     /** Name of the registered agent to route to. Defaults to "default". */
     @Builder.Default
-    private final String agentName = "default";
+    private String agentName = "default";
 
     /**
      * Session ID to use for this webhook. If null, a dedicated session
      * "webhook:{id}" is auto-created, giving each webhook its own
      * isolated conversation memory.
      */
-    private final String sessionId;
+    private String sessionId;
 
     /**
      * Jinja-style template for the agent prompt.
@@ -42,20 +48,20 @@ public class WebhookDefinition {
      *   {{timestamp}}    — ISO-8601 timestamp of the event
      */
     @Builder.Default
-    private final String promptTemplate = "A webhook event was received. Process this payload:\n{{payload}}";
+    private String promptTemplate = "A webhook event was received. Process this payload:\n{{payload}}";
 
     /** Where to send the agent's response after processing. */
     @Builder.Default
-    private final OutputTarget outputTarget = OutputTarget.LOG;
+    private OutputTarget outputTarget = OutputTarget.LOG;
 
     /**
      * HTTP URL to POST the result to.
      * Required when outputTarget == REPLY_URL; ignored otherwise.
      */
-    private final String replyUrl;
+    private String replyUrl;
 
     @Builder.Default
-    private final Instant registeredAt = Instant.now();
+    private Instant registeredAt = Instant.now();
 
     public enum OutputTarget {
         /** Discard the result silently. Use for fire-and-forget. */

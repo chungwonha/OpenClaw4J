@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 
@@ -54,10 +56,19 @@ public class BootstrapExtraFilesHook {
                             .filter(f -> f.isFile() && (f.getName().endsWith(".md") || f.getName().endsWith(".txt")))
                             .toList();
 
-                    int count = extraFiles.size();
                     extraFiles.forEach(f -> log.info("[BootstrapExtraFilesHook] Found extra file: {}", f.getName()));
 
-                    context.setResult("Found " + count + " extra bootstrap files");
+                    StringBuilder combined = new StringBuilder("\n\n--- Bootstrap Context ---\n");
+                    for (File file : extraFiles) {
+                        try {
+                            String content = Files.readString(file.toPath());
+                            combined.append(file.getName()).append(":\n").append(content).append("\n");
+                        } catch (IOException e) {
+                            log.warn("[BootstrapExtraFilesHook] Could not read file '{}': {}",
+                                    file.getName(), e.getMessage());
+                        }
+                    }
+                    context.setResult(combined.toString());
                 })
                 .enabled(false)
                 .build());

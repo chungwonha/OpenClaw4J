@@ -1,7 +1,10 @@
 package com.chung.ai.software.openclaw4j.gateway.cron;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 /**
@@ -12,20 +15,23 @@ import java.time.Instant;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CronDefinition {
 
-    private final String id;
-    private final String name;
-    private final String description;
+    private String id;
+    private String name;
+    private String description;
 
     /** Name of the registered agent to route to. Defaults to "default". */
     @Builder.Default
-    private final String agentName = "default";
+    private String agentName = "default";
 
     /**
      * Session ID to use. If null, a dedicated session "cron:{id}" is auto-created.
      */
-    private final String sessionId;
+    private String sessionId;
 
     /**
      * Spring cron expression (6 fields: second minute hour day-of-month month day-of-week).
@@ -33,7 +39,7 @@ public class CronDefinition {
      *   "0 * * * * *"     — every minute
      *   "0 0 9 * * MON-FRI" — 9am on weekdays
      */
-    private final String cronExpression;
+    private String cronExpression;
 
     /**
      * Prompt template. Supported placeholders:
@@ -41,24 +47,24 @@ public class CronDefinition {
      *   {{timestamp}} — ISO-8601 timestamp when the job fired
      */
     @Builder.Default
-    private final String promptTemplate = "A scheduled task has fired. Task: {{cronName}}\nTimestamp: {{timestamp}}";
+    private String promptTemplate = "A scheduled task has fired. Task: {{cronName}}\nTimestamp: {{timestamp}}";
 
     /** Where to send the agent's response. */
     @Builder.Default
-    private final OutputTarget outputTarget = OutputTarget.LOG;
+    private OutputTarget outputTarget = OutputTarget.LOG;
 
     /**
      * HTTP URL to POST the result to.
      * Required when outputTarget == REPLY_URL; ignored otherwise.
      */
-    private final String replyUrl;
+    private String replyUrl;
 
     /** Whether this job is currently active. Volatile so enable/disable is visible across threads. */
     @Builder.Default
     private volatile boolean enabled = true;
 
     @Builder.Default
-    private final Instant registeredAt = Instant.now();
+    private Instant registeredAt = Instant.now();
 
     public enum OutputTarget {
         /** Discard the result silently. */

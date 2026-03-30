@@ -1,10 +1,13 @@
 package com.chung.ai.software.openclaw4j.gateway.agent;
 
+import com.chung.ai.software.openclaw4j.gateway.persistence.RegistryPersistenceService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,9 +32,13 @@ public class AgentRegistry {
 
     public static final String DEFAULT_AGENT = "default";
 
-    private final ConcurrentHashMap<String, AgentDefinition> definitions = new ConcurrentHashMap<>();
+    private static final String PERSISTENCE_TYPE = "agents";
 
-    public AgentRegistry() {
+    private final ConcurrentHashMap<String, AgentDefinition> definitions = new ConcurrentHashMap<>();
+    private final RegistryPersistenceService persistence;
+
+    public AgentRegistry(RegistryPersistenceService persistence) {
+        this.persistence = persistence;
         // Pre-register the default general-purpose agent.
         // Sessions use this unless the user explicitly switches with /use <name>.
         register(AgentDefinition.builder()
@@ -44,6 +51,18 @@ public class AgentRegistry {
         log.info("[AgentRegistry] Initialized with default agent");
     }
 
+    @PostConstruct
+    public void loadPersistedDefinitions() {
+        List<AgentDefinition> saved = persistence.loadAll(PERSISTENCE_TYPE, AgentDefinition.class);
+        for (AgentDefinition definition : saved) {
+            // Skip the default agent — it is already registered above with canonical description
+            if (DEFAULT_AGENT.equals(definition.getName())) continue;
+            definitions.put(definition.getName(), definition);
+            log.info("[AgentRegistry] Restored agent='{}' from persistence", definition.getName());
+        }
+        log.info("[AgentRegistry] Loaded {} persisted agent(s)", saved.size());
+    }
+
     /**
      * Register a new agent definition (or overwrite an existing one by the same name).
      * All sessions that subsequently route a message to {@code definition.name} will
@@ -53,6 +72,7 @@ public class AgentRegistry {
         definitions.put(definition.getName(), definition);
         log.info("[AgentRegistry] Agent registered: name='{}', description='{}'",
                 definition.getName(), definition.getDescription());
+        persistence.save(PERSISTENCE_TYPE, definition.getName(), definition);
         return definition;
     }
 
@@ -63,7 +83,10 @@ public class AgentRegistry {
             return false;
         }
         boolean removed = definitions.remove(name) != null;
-        if (removed) log.info("[AgentRegistry] Agent unregistered: '{}'", name);
+        if (removed) {
+            log.info("[AgentRegistry] Agent unregistered: '{}'", name);
+            persistence.delete(PERSISTENCE_TYPE, name);
+        }
         return removed;
     }
 

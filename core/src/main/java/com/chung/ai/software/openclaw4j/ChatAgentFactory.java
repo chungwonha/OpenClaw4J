@@ -6,12 +6,14 @@ import com.chung.ai.software.openclaw4j.tools.HttpRequestTool;
 import com.chung.ai.software.openclaw4j.mcp.McpRegistry;
 import com.chung.ai.software.openclaw4j.mcp.McpServerConfig;
 import com.chung.ai.software.openclaw4j.tool.CompositeToolProvider;
+import com.chung.ai.software.openclaw4j.tool.ToolExecutionListener;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.mcp.McpToolProvider;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,9 @@ import java.util.List;
 @Service
 @Slf4j
 public class ChatAgentFactory {
+
+    @Setter
+    private ToolExecutionListener toolExecutionListener;
 
     private final ChatLanguageModel chatModel;
     private final FileManagementTool fileManagementTool;
@@ -47,10 +52,14 @@ public class ChatAgentFactory {
                 .description(description)
                 .mcpServers(new ArrayList<>())
                 .build();
-        return createChatAgent(metadata);
+        return createChatAgentInternal(metadata, name);
     }
 
     public ChatAgent createChatAgent(AgentMetadata metadata) {
+        return createChatAgentInternal(metadata, metadata.getName());
+    }
+
+    private ChatAgent createChatAgentInternal(AgentMetadata metadata, String sessionId) {
 
         ChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(200);
 
@@ -77,6 +86,8 @@ public class ChatAgentFactory {
         compositeToolProvider.addStaticTools(fileManagementTool);
         compositeToolProvider.addStaticTools(httpRequestTool);
         compositeToolProvider.addStaticTools(commandLineTool);
+        compositeToolProvider.setSessionId(sessionId);
+        compositeToolProvider.setToolExecutionListener(toolExecutionListener);
 
         ChatAgent.ChatAgentService service = AiServices.builder(ChatAgent.ChatAgentService.class)
                 .chatMemory(chatMemory)

@@ -2,6 +2,7 @@ package com.chung.ai.software.openclaw4j.gateway.config;
 
 import com.chung.ai.software.openclaw4j.AgentPersistenceService;
 import com.chung.ai.software.openclaw4j.ChatAgentFactory;
+import com.chung.ai.software.openclaw4j.gateway.pipeline.GatewayToolExecutionListener;
 import com.chung.ai.software.openclaw4j.tools.CommandLineTool;
 import com.chung.ai.software.openclaw4j.tools.FileManagementTool;
 import com.chung.ai.software.openclaw4j.tools.HttpRequestTool;
@@ -79,9 +80,12 @@ public class CoreAgentConfig {
                                              FileManagementTool fileManagementTool,
                                              HttpRequestTool httpRequestTool,
                                              CommandLineTool commandLineTool,
-                                             AgentPersistenceService agentPersistenceService) {
+                                             AgentPersistenceService agentPersistenceService,
+                                             GatewayToolExecutionListener toolExecutionListener) {
         log.info("[CoreAgent] ChatAgentFactory ready — agents will have file, HTTP, and CLI tools");
-        return new ChatAgentFactory(chatModel, fileManagementTool, httpRequestTool,
+        ChatAgentFactory factory = new ChatAgentFactory(chatModel, fileManagementTool, httpRequestTool,
                 commandLineTool, agentPersistenceService);
+        factory.setToolExecutionListener(toolExecutionListener);
+        return factory;
     }
 }

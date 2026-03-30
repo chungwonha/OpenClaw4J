@@ -4,12 +4,14 @@ import com.chung.ai.software.openclaw4j.ChatAgent;
 import com.chung.ai.software.openclaw4j.ChatAgentFactory;
 import com.chung.ai.software.openclaw4j.gateway.agent.AgentDefinition;
 import com.chung.ai.software.openclaw4j.gateway.agent.AgentRegistry;
+import com.chung.ai.software.openclaw4j.gateway.hook.HookContext;
 import com.chung.ai.software.openclaw4j.gateway.hook.HookEventType;
 import com.chung.ai.software.openclaw4j.gateway.hook.HookExecutor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -95,6 +97,9 @@ public class AgentSession {
         if ("/new".equalsIgnoreCase(msg)) {
             return handleNewCommand();
         }
+        if (msg.startsWith("/delegate ")) {
+            return handleDelegateCommand(msg.substring(10).trim());
+        }
         if (msg.startsWith("/use ")) {
             return handleUseCommand(msg.substring(5).trim());
         }
@@ -143,6 +148,27 @@ public class AgentSession {
                 + "Your next messages will go to this agent.";
     }
 
+    private String handleDelegateCommand(String rest) {
+        // Expected format: @targetAgent task description
+        if (!rest.startsWith("@")) {
+            return "❌ Usage: `/delegate @agentName task description`";
+        }
+        int space = rest.indexOf(' ');
+        if (space < 2) {
+            return "❌ Usage: `/delegate @agentName task description`";
+        }
+        String targetAgentName = rest.substring(1, space).trim();
+        String task = rest.substring(space + 1).trim();
+
+        if (!agentRegistry.exists(targetAgentName)) {
+            return "❌ Agent **" + targetAgentName + "** not found.\n" + buildAgentList();
+        }
+
+        log.info("[Session] '{}' delegating task to agent='{}': {}", conversationId, targetAgentName, task);
+        String result = routeTo(targetAgentName, task);
+        return "**[from @" + targetAgentName + "]:** " + result;
+    }
+
     private String handleListCommand() {
         return "**Registered agents** (active: **" + activeAgentName + "**):\n"
                 + buildAgentList()
@@ -184,16 +210,25 @@ public class AgentSession {
         // Key = "conversationId:agentName" so persistence files stay scoped.
         ChatAgent agent = agentInstances.computeIfAbsent(agentName, name -> {
             String instanceId = conversationId + ":" + name;
-            log.info("[Session] Creating instance of agent='{}' for session='{}'",
-                    name, conversationId);
-            hookExecutor.fire(HookEventType.AGENT_BOOTSTRAP, conversationId,
+            log.info("[Session] Creating instance of agent='{}' for session='{}'", name, conversationId);
+            HookContext bootstrapContext = hookExecutor.fire(HookEventType.AGENT_BOOTSTRAP, conversationId,
                     "Bootstrapping agent: " + name);
-            return agentFactory.createChatAgent(instanceId, def.get().getDescription());
+            String baseDescription = def.get().getDescription();
+            String extraContext = bootstrapContext.getResult();
+            String fullDescription = (extraContext != null && !extraContext.isBlank())
+                    ? baseDescription + extraContext
+                    : baseDescription;
+            return agentFactory.createChatAgent(instanceId, fullDescription);
         });
 
         try {
             log.debug("[Session] Routing to agent='{}' in session='{}'", agentName, conversationId);
-            return agent.chat(message);
+            hookExecutor.fire(HookEventType.LLM_INPUT, conversationId, message,
+                    Map.of("agentName", agentName));
+            String reply = agent.chat(message);
+            hookExecutor.fire(HookEventType.LLM_OUTPUT, conversationId, reply,
+                    Map.of("agentName", agentName));
+            return reply;
         } catch (Exception e) {
             log.error("[Session] Agent='{}' call failed in session='{}'",
                     agentName, conversationId, e);

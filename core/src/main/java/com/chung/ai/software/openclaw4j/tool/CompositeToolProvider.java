@@ -7,6 +7,7 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Method;
@@ -19,6 +20,12 @@ public class CompositeToolProvider implements ToolProvider {
 
     private final List<ToolProvider> toolProviders;
     private final Map<ToolSpecification, ToolExecutor> staticTools = new HashMap<>();
+
+    @Setter
+    private String sessionId;
+
+    @Setter
+    private ToolExecutionListener toolExecutionListener;
 
     public CompositeToolProvider(List<ToolProvider> toolProviders) {
         this.toolProviders = new ArrayList<>(toolProviders);
@@ -39,15 +46,17 @@ public class CompositeToolProvider implements ToolProvider {
     public ToolProviderResult provideTools(ToolProviderRequest request) {
         ToolProviderResult.Builder builder = ToolProviderResult.builder();
 
-        // Add static tools
-        staticTools.forEach(builder::add);
+        // Add static tools, wrapped with listener callbacks
+        staticTools.forEach((spec, executor) ->
+                builder.add(spec, wrapExecutor(spec.name(), executor)));
 
-        // Add tools from other providers
+        // Add tools from other providers, wrapped with listener callbacks
         for (ToolProvider provider : toolProviders) {
             try {
                 ToolProviderResult result = provider.provideTools(request);
                 if (result != null && result.tools() != null) {
-                    builder.addAll(result.tools());
+                    result.tools().forEach((spec, executor) ->
+                            builder.add(spec, wrapExecutor(spec.name(), executor)));
                 }
             } catch (Exception e) {
                 log.error("Error providing tools from provider: {}", provider.getClass().getName(), e);
@@ -55,5 +64,31 @@ public class CompositeToolProvider implements ToolProvider {
         }
 
         return builder.build();
+    }
+
+    private ToolExecutor wrapExecutor(String toolName, ToolExecutor delegate) {
+        return (toolExecutionRequest, memoryId) -> {
+            String toolInput = toolExecutionRequest.arguments();
+
+            if (toolExecutionListener != null) {
+                try {
+                    toolExecutionListener.beforeToolExecution(toolName, toolInput, sessionId);
+                } catch (Exception e) {
+                    log.warn("[CompositeToolProvider] ToolExecutionListener.beforeToolExecution threw — ignoring", e);
+                }
+            }
+
+            String result = delegate.execute(toolExecutionRequest, memoryId);
+
+            if (toolExecutionListener != null) {
+                try {
+                    toolExecutionListener.afterToolExecution(toolName, toolInput, result, sessionId);
+                } catch (Exception e) {
+                    log.warn("[CompositeToolProvider] ToolExecutionListener.afterToolExecution threw — ignoring", e);
+                }
+            }
+
+            return result;
+        };
     }
 }
